@@ -1,0 +1,511 @@
+<!DOCTYPE html>
+<html lang="en" class="light">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>CampusFind — Lovely Professional University Lost &amp; Found</title>
+  <link rel="stylesheet" href="styles.css">
+  <script src="https://cdn.tailwindcss.com/3.4.17"></script>
+  <script>
+    tailwind.config = {
+      darkMode: 'class',
+      theme: {
+        extend: {
+          fontFamily: {
+            sans: ['Inter', 'system-ui', '-apple-system', 'sans-serif'],
+          },
+          colors: {
+            lpu: {
+              50: '#fff7ed',
+              100: '#ffedd5',
+              500: '#f97316',
+              600: '#ea580c',
+              700: '#c2410c',
+            }
+          }
+        }
+      }
+    };
+  </script>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet" />
+  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+  <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+  <script src="https://unpkg.com/lucide@0.460.0/dist/umd/lucide.min.js"></script>
+  <link rel="stylesheet" href="finder.css" />
+</head>
+<body class="bg-slate-50 text-slate-900 dark:bg-slate-950 dark:text-slate-100 transition-colors duration-200 min-h-screen flex flex-col">
+
+  <!-- Toast Notification -->
+  <div id="toast-container" class="fixed top-20 right-4 z-[9999] flex flex-col gap-2 pointer-events-none"></div>
+
+  <!-- Login / Logged-Out Screen -->
+  <div id="login-screen" class="hidden fixed inset-0 z-50 bg-slate-100 dark:bg-slate-950 flex items-center justify-center p-4">
+    <div class="w-full max-w-md bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl shadow-xl p-6 sm:p-8">
+      <div class="flex items-center gap-3 mb-6">
+        <div class="w-11 h-11 rounded-xl bg-lpu-600 text-white flex items-center justify-center shadow-sm">
+          <i data-lucide="compass" class="w-6 h-6"></i>
+        </div>
+        <div>
+          <h1 class="text-xl font-bold tracking-tight">CampusFind</h1>
+          <p class="text-xs font-medium text-lpu-600 dark:text-lpu-500">Lovely Professional University</p>
+        </div>
+      </div>
+      <h2 class="text-lg font-semibold mb-1">Sign in to CampusFind</h2>
+      <p class="text-sm text-slate-500 dark:text-slate-400 mb-5">600-Acre Campus Lost &amp; Found Network</p>
+      <form id="login-form" class="space-y-4">
+        <div>
+          <label for="login-username" class="block text-xs font-semibold uppercase tracking-wider text-slate-500 dark:text-slate-400 mb-1">Username</label>
+          <input id="login-username" type="text" required class="w-full px-3.5 py-2.5 rounded-xl border border-slate-300 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 text-sm focus:outline-none focus:ring-2 focus:ring-lpu-500" placeholder="aarav_lpu" />
+        </div>
+        <div>
+          <label for="login-password" class="block text-xs font-semibold uppercase tracking-wider text-slate-500 dark:text-slate-400 mb-1">Password</label>
+          <input id="login-password" type="password" required class="w-full px-3.5 py-2.5 rounded-xl border border-slate-300 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 text-sm focus:outline-none focus:ring-2 focus:ring-lpu-500" placeholder="Enter password" />
+        </div>
+        <p id="login-error" class="hidden text-xs font-medium text-rose-600 dark:text-rose-400"></p>
+        <button type="submit" class="w-full py-2.5 px-4 rounded-xl bg-lpu-600 hover:bg-lpu-700 text-white font-semibold text-sm transition cursor-pointer">
+          Log In
+        </button>
+      </form>
+      <div class="mt-4 pt-4 border-t border-slate-200 dark:border-slate-800 text-xs text-slate-500 dark:text-slate-400 flex items-center justify-between">
+        <span>Demo account: <strong id="login-hint-user" class="text-slate-700 dark:text-slate-300">@aarav_lpu</strong></span>
+        <button id="quick-fill-login" type="button" class="text-lpu-600 dark:text-lpu-500 font-semibold hover:underline cursor-pointer">Auto-fill credentials</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Main App Shell -->
+  <div id="app-shell" class="flex-1 flex flex-col">
+    <!-- Top Header + Navigation Bar -->
+    <header class="sticky top-0 z-40 bg-white/95 dark:bg-slate-900/95 backdrop-blur border-b border-slate-200 dark:border-slate-800">
+      <div class="max-w-6xl mx-auto px-4 h-16 flex items-center justify-between gap-3">
+        <!-- Website Name + University Name Beside It -->
+        <button id="brand-home-btn" type="button" class="flex items-center gap-2.5 text-left min-w-0 cursor-pointer">
+          <div class="w-9 h-9 rounded-xl bg-lpu-600 text-white flex items-center justify-center shrink-0 shadow-sm">
+            <i data-lucide="compass" class="w-5 h-5"></i>
+          </div>
+          <div class="flex flex-wrap items-baseline gap-x-2 min-w-0">
+            <span class="text-lg font-extrabold tracking-tight text-slate-900 dark:text-white">CampusFind</span>
+            <span class="text-xs sm:text-sm font-semibold text-lpu-600 dark:text-lpu-500 truncate border-l border-slate-300 dark:border-slate-700 pl-2">Lovely Professional University</span>
+          </div>
+        </button>
+
+        <!-- Desktop Navigation Bar (6 Required Buttons) -->
+        <nav aria-label="Primary Navigation" class="hidden md:flex items-center gap-1">
+          <button data-nav="home" class="nav-btn flex items-center gap-1.5 px-3 py-2 rounded-xl text-sm font-medium transition cursor-pointer">
+            <i data-lucide="home" class="w-4 h-4"></i>
+            <span>Home</span>
+          </button>
+          <button data-nav="search" class="nav-btn flex items-center gap-1.5 px-3 py-2 rounded-xl text-sm font-medium transition cursor-pointer">
+            <i data-lucide="search" class="w-4 h-4"></i>
+            <span>Search</span>
+          </button>
+          <button data-nav="add" class="nav-btn flex items-center gap-1.5 px-3 py-2 rounded-xl text-sm font-medium transition cursor-pointer">
+            <i data-lucide="plus-square" class="w-4 h-4"></i>
+            <span>Add Post</span>
+          </button>
+          <button data-nav="messages" class="nav-btn relative flex items-center gap-1.5 px-3 py-2 rounded-xl text-sm font-medium transition cursor-pointer">
+            <i data-lucide="message-circle" class="w-4 h-4"></i>
+            <span>Messages</span>
+            <span id="nav-msg-badge" class="hidden ml-0.5 px-1.5 py-0.5 text-[10px] font-bold rounded-full bg-lpu-600 text-white">0</span>
+          </button>
+          <button data-nav="map" class="nav-btn flex items-center gap-1.5 px-3 py-2 rounded-xl text-sm font-medium transition cursor-pointer">
+            <i data-lucide="map-pin" class="w-4 h-4"></i>
+            <span>Map</span>
+          </button>
+          <button data-nav="profile" class="nav-btn flex items-center gap-1.5 px-3 py-2 rounded-xl text-sm font-medium transition cursor-pointer">
+            <i data-lucide="user" class="w-4 h-4"></i>
+            <span>Profile</span>
+          </button>
+        </nav>
+
+        <!-- Compact Help Score Pill -->
+        <button id="header-score-btn" type="button" class="flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-amber-50 dark:bg-amber-950/50 border border-amber-200 dark:border-amber-800/60 text-amber-700 dark:text-amber-300 text-xs font-semibold shrink-0 cursor-pointer" title="Your Help Score">
+          <i data-lucide="award" class="w-3.5 h-3.5"></i>
+          <span id="header-help-score">145</span>
+          <span class="hidden sm:inline">pts</span>
+        </button>
+      </div>
+    </header>
+
+    <!-- Main Content Area -->
+    <main class="flex-1 max-w-6xl w-full mx-auto px-4 py-6 pb-24 md:pb-8">
+
+      <!-- VIEW 1: HOME FEED (Instagram-style) -->
+      <section id="view-home" class="view-section">
+        <!-- Search & Filter Bar (opened/focused via Search nav button) -->
+        <div id="search-panel" class="hidden max-w-2xl mx-auto mb-6 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl p-4 shadow-sm">
+          <div class="flex items-center justify-between mb-3">
+            <h2 class="text-sm font-bold flex items-center gap-2">
+              <i data-lucide="search" class="w-4 h-4 text-lpu-600"></i>
+              Search Lost &amp; Found Objects
+            </h2>
+            <button id="close-search-btn" type="button" class="text-xs text-slate-500 hover:text-slate-700 dark:hover:text-slate-300 cursor-pointer">Close</button>
+          </div>
+          <div class="grid grid-cols-1 sm:grid-cols-12 gap-2.5">
+            <div class="sm:col-span-6 relative">
+              <i data-lucide="search" class="w-4 h-4 text-slate-400 absolute left-3 top-1/2 -translate-y-1/2"></i>
+              <input id="search-keyword" type="text" placeholder="Search name, keyword, block (e.g. earbuds, library)..." class="w-full pl-9 pr-3 py-2 rounded-xl border border-slate-300 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 text-sm focus:outline-none focus:ring-2 focus:ring-lpu-500" />
+            </div>
+            <div class="sm:col-span-3">
+              <select id="search-category" class="w-full px-3 py-2 rounded-xl border border-slate-300 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 text-sm focus:outline-none focus:ring-2 focus:ring-lpu-500">
+                <option value="all">All Types</option>
+                <option value="Electronics">Electronics</option>
+                <option value="Bags">Bags</option>
+                <option value="Bottles & Gear">Bottles &amp; Gear</option>
+                <option value="ID & Keys">ID &amp; Keys</option>
+                <option value="Books & Notes">Books &amp; Notes</option>
+              </select>
+            </div>
+            <div class="sm:col-span-3">
+              <select id="search-type" class="w-full px-3 py-2 rounded-xl border border-slate-300 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 text-sm focus:outline-none focus:ring-2 focus:ring-lpu-500">
+                <option value="all">Lost &amp; Found</option>
+                <option value="lost">Lost Only</option>
+                <option value="found">Found Only</option>
+              </select>
+            </div>
+          </div>
+          <div class="mt-2.5 flex items-center justify-between text-xs text-slate-500 dark:text-slate-400">
+            <span id="search-result-count">Showing all posts</span>
+            <button id="reset-search-btn" type="button" class="text-lpu-600 dark:text-lpu-500 font-semibold hover:underline cursor-pointer">Reset filters</button>
+          </div>
+        </div>
+
+        <!-- Quick Feed Filter Chips -->
+        <div class="max-w-2xl mx-auto mb-5 flex items-center justify-between gap-2 flex-wrap">
+          <div class="flex items-center gap-2 overflow-x-auto no-scrollbar">
+            <button data-feed-filter="all" class="feed-chip px-3.5 py-1.5 rounded-full text-xs font-semibold transition cursor-pointer">All Posts</button>
+            <button data-feed-filter="lost" class="feed-chip px-3.5 py-1.5 rounded-full text-xs font-semibold transition cursor-pointer">Lost Items</button>
+            <button data-feed-filter="found" class="feed-chip px-3.5 py-1.5 rounded-full text-xs font-semibold transition cursor-pointer">Found Items</button>
+            <button data-feed-filter="returned" class="feed-chip px-3.5 py-1.5 rounded-full text-xs font-semibold transition cursor-pointer">Returned</button>
+          </div>
+          <button id="home-quick-add-btn" type="button" class="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-lpu-600 hover:bg-lpu-700 text-white text-xs font-semibold transition cursor-pointer">
+            <i data-lucide="plus" class="w-3.5 h-3.5"></i>
+            Post Item
+          </button>
+        </div>
+
+        <!-- Instagram-Style Feed Container -->
+        <div id="feed-container" class="max-w-2xl mx-auto space-y-6"></div>
+      </section>
+
+      <!-- VIEW 2: ADD POST -->
+      <section id="view-add" class="view-section hidden">
+        <div class="max-w-3xl mx-auto bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl shadow-sm p-5 sm:p-7">
+          <div class="flex items-center justify-between mb-5">
+            <div>
+              <h2 class="text-xl font-bold">Add Lost or Found Property</h2>
+              <p class="text-sm text-slate-500 dark:text-slate-400">Post details, photo, and pin exact locations on the 600-acre LPU campus.</p>
+            </div>
+            <button type="button" id="cancel-add-btn" class="text-xs font-semibold text-slate-500 hover:text-slate-700 dark:hover:text-slate-300 cursor-pointer">Back to Home</button>
+          </div>
+
+          <form id="add-post-form" class="space-y-5">
+            <!-- 1. Lost or Found Toggle -->
+            <div>
+              <label class="block text-xs font-semibold uppercase tracking-wider text-slate-500 dark:text-slate-400 mb-2">1. Property Status</label>
+              <div class="grid grid-cols-2 gap-3">
+                <label class="cursor-pointer">
+                  <input type="radio" name="postType" value="found" checked class="peer sr-only" />
+                  <div class="p-3.5 rounded-xl border-2 border-slate-200 dark:border-slate-700 peer-checked:border-emerald-500 peer-checked:bg-emerald-50/70 dark:peer-checked:bg-emerald-950/30 transition flex items-center gap-3">
+                    <span class="w-8 h-8 rounded-lg bg-emerald-100 dark:bg-emerald-900/60 text-emerald-700 dark:text-emerald-300 flex items-center justify-center">
+                      <i data-lucide="package-check" class="w-4 h-4"></i>
+                    </span>
+                    <div>
+                      <div class="font-bold text-sm">Found Property</div>
+                      <div class="text-xs text-slate-500 dark:text-slate-400">I found someone's item</div>
+                    </div>
+                  </div>
+                </label>
+                <label class="cursor-pointer">
+                  <input type="radio" name="postType" value="lost" class="peer sr-only" />
+                  <div class="p-3.5 rounded-xl border-2 border-slate-200 dark:border-slate-700 peer-checked:border-rose-500 peer-checked:bg-rose-50/70 dark:peer-checked:bg-rose-950/30 transition flex items-center gap-3">
+                    <span class="w-8 h-8 rounded-lg bg-rose-100 dark:bg-rose-900/60 text-rose-700 dark:text-rose-300 flex items-center justify-center">
+                      <i data-lucide="alert-circle" class="w-4 h-4"></i>
+                    </span>
+                    <div>
+                      <div class="font-bold text-sm">Lost Property</div>
+                      <div class="text-xs text-slate-500 dark:text-slate-400">I lost my item on campus</div>
+                    </div>
+                  </div>
+                </label>
+              </div>
+            </div>
+
+            <!-- 2. Item Name, Category & Description -->
+            <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+              <div>
+                <label for="post-title" class="block text-xs font-semibold uppercase tracking-wider text-slate-500 dark:text-slate-400 mb-1.5">Object Name</label>
+                <input id="post-title" type="text" required placeholder="e.g., Black Casio Scientific Calculator" class="w-full px-3.5 py-2.5 rounded-xl border border-slate-300 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 text-sm focus:outline-none focus:ring-2 focus:ring-lpu-500" />
+              </div>
+              <div>
+                <label for="post-category" class="block text-xs font-semibold uppercase tracking-wider text-slate-500 dark:text-slate-400 mb-1.5">Property Type</label>
+                <select id="post-category" class="w-full px-3.5 py-2.5 rounded-xl border border-slate-300 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 text-sm focus:outline-none focus:ring-2 focus:ring-lpu-500">
+                  <option value="Electronics">Electronics</option>
+                  <option value="Bags">Bags</option>
+                  <option value="Bottles & Gear">Bottles &amp; Gear</option>
+                  <option value="ID & Keys">ID &amp; Keys</option>
+                  <option value="Books & Notes">Books &amp; Notes</option>
+                </select>
+              </div>
+            </div>
+
+            <div>
+              <label for="post-description" class="block text-xs font-semibold uppercase tracking-wider text-slate-500 dark:text-slate-400 mb-1.5">2. Description of the Property</label>
+              <textarea id="post-description" rows="3" required placeholder="Describe color, brand, unique stickers, room number, or time..." class="w-full px-3.5 py-2.5 rounded-xl border border-slate-300 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 text-sm focus:outline-none focus:ring-2 focus:ring-lpu-500"></textarea>
+            </div>
+
+            <!-- 3. Photo Upload -->
+            <div>
+              <label class="block text-xs font-semibold uppercase tracking-wider text-slate-500 dark:text-slate-400 mb-1.5">3. Add Photo of the Property</label>
+              <div class="flex flex-col sm:flex-row items-start sm:items-center gap-4">
+                <label class="inline-flex items-center gap-2 px-4 py-2.5 rounded-xl border border-slate-300 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 hover:bg-slate-100 dark:hover:bg-slate-700 text-sm font-medium cursor-pointer transition">
+                  <i data-lucide="image-plus" class="w-4 h-4 text-lpu-600"></i>
+                  <span>Upload Photo</span>
+                  <input id="post-photo-input" type="file" accept="image/*" class="hidden" />
+                </label>
+                <span id="post-photo-name" class="text-xs text-slate-500 dark:text-slate-400">Optional: upload a photo from your device</span>
+              </div>
+              <div id="post-photo-preview-wrap" class="hidden mt-3 relative w-48 h-36 rounded-xl overflow-hidden border border-slate-200 dark:border-slate-700">
+                <img id="post-photo-preview" src="" alt="Preview" class="w-full h-full object-cover" />
+                <button id="remove-photo-btn" type="button" class="absolute top-1.5 right-1.5 w-6 h-6 rounded-full bg-slate-900/75 text-white flex items-center justify-center text-xs cursor-pointer">×</button>
+              </div>
+            </div>
+
+            <!-- 4. Mark Lost/Found Location & Pickup/Collection Location + Small University Map -->
+            <div class="border-t border-slate-200 dark:border-slate-800 pt-5">
+              <div class="flex items-center justify-between flex-wrap gap-2 mb-3">
+                <label class="text-xs font-semibold uppercase tracking-wider text-slate-500 dark:text-slate-400">4. Mark Campus Locations on LPU Map</label>
+                <button id="toggle-mini-map-btn" type="button" class="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-lpu-50 dark:bg-lpu-700/20 text-lpu-700 dark:text-lpu-500 text-xs font-semibold cursor-pointer">
+                  <i data-lucide="map" class="w-3.5 h-3.5"></i>
+                  <span id="mini-map-toggle-label">Open Small Campus Map</span>
+                </button>
+              </div>
+
+              <div class="grid grid-cols-1 sm:grid-cols-2 gap-3 mb-3">
+                <div>
+                  <label for="post-incident-loc" class="block text-xs font-medium text-slate-600 dark:text-slate-300 mb-1">Where Lost / Found</label>
+                  <div class="flex gap-1.5">
+                    <input id="post-incident-loc" type="text" required placeholder="e.g., Block 37 Central Library" class="flex-1 px-3 py-2 rounded-xl border border-slate-300 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 text-sm focus:outline-none focus:ring-2 focus:ring-lpu-500" />
+                    <button id="pick-incident-pin-btn" type="button" class="px-2.5 py-2 rounded-xl border border-rose-300 dark:border-rose-700 bg-rose-50 dark:bg-rose-950/40 text-rose-700 dark:text-rose-300 text-xs font-semibold cursor-pointer" title="Pick on small map">Pin</button>
+                  </div>
+                </div>
+                <div>
+                  <label for="post-pickup-loc" class="block text-xs font-medium text-slate-600 dark:text-slate-300 mb-1">Collection / Pickup Point</label>
+                  <div class="flex gap-1.5">
+                    <input id="post-pickup-loc" type="text" required placeholder="e.g., Uni Mall Security Desk" class="flex-1 px-3 py-2 rounded-xl border border-slate-300 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 text-sm focus:outline-none focus:ring-2 focus:ring-lpu-500" />
+                    <button id="pick-pickup-pin-btn" type="button" class="px-2.5 py-2 rounded-xl border border-emerald-300 dark:border-emerald-700 bg-emerald-50 dark:bg-emerald-950/40 text-emerald-700 dark:text-emerald-300 text-xs font-semibold cursor-pointer" title="Pick on small map">Pin</button>
+                  </div>
+                </div>
+              </div>
+
+              <!-- Small Interactive LPU Map Picker -->
+              <div id="mini-map-wrapper" class="hidden rounded-xl border border-slate-300 dark:border-slate-700 overflow-hidden bg-slate-100 dark:bg-slate-800">
+                <div class="px-3 py-2 bg-slate-100 dark:bg-slate-800 border-b border-slate-200 dark:border-slate-700 flex items-center justify-between flex-wrap gap-2 text-xs">
+                  <div class="flex items-center gap-2">
+                    <span class="font-semibold">Click map to set:</span>
+                    <button id="mode-incident-btn" type="button" class="px-2.5 py-1 rounded-lg bg-rose-600 text-white font-semibold cursor-pointer">Lost/Found Spot</button>
+                    <button id="mode-pickup-btn" type="button" class="px-2.5 py-1 rounded-lg bg-slate-200 dark:bg-slate-700 text-slate-700 dark:text-slate-200 font-semibold cursor-pointer">Pickup Spot</button>
+                  </div>
+                  <span id="mini-map-coords" class="text-slate-500 dark:text-slate-400">Click anywhere on LPU map</span>
+                </div>
+                <div id="mini-map" style="height: 250px; width: 100%;"></div>
+              </div>
+            </div>
+
+            <div class="pt-2 flex justify-end gap-3">
+              <button type="submit" class="px-6 py-2.5 rounded-xl bg-lpu-600 hover:bg-lpu-700 text-white font-semibold text-sm shadow-sm transition cursor-pointer">
+                Publish to Home Feed
+              </button>
+            </div>
+          </form>
+        </div>
+      </section>
+
+      <!-- VIEW 3: MESSAGES (Latest-to-Oldest + Live Chat) -->
+      <section id="view-messages" class="view-section hidden">
+        <div class="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl shadow-sm overflow-hidden grid grid-cols-1 md:grid-cols-12 min-h-[540px]">
+          <!-- Conversation List (Sorted Latest to Oldest) -->
+          <div class="md:col-span-4 border-b md:border-b-0 md:border-r border-slate-200 dark:border-slate-800 flex flex-col">
+            <div class="p-4 border-b border-slate-200 dark:border-slate-800 flex items-center justify-between">
+              <h2 class="font-bold text-base">Messages</h2>
+              <span class="text-xs text-slate-500 dark:text-slate-400">Latest first</span>
+            </div>
+            <div id="conversation-list" class="flex-1 divide-y divide-slate-100 dark:divide-slate-800 overflow-y-auto max-h-[500px]"></div>
+          </div>
+
+          <!-- Active Chat Thread -->
+          <div class="md:col-span-8 flex flex-col bg-slate-50/60 dark:bg-slate-950/40">
+            <div id="chat-header" class="p-4 bg-white dark:bg-slate-900 border-b border-slate-200 dark:border-slate-800 flex items-center justify-between gap-3">
+              <div class="flex items-center gap-3 min-w-0">
+                <div id="chat-partner-avatar" class="w-10 h-10 rounded-full bg-lpu-600 text-white flex items-center justify-center font-bold text-sm shrink-0">?</div>
+                <div class="min-w-0">
+                  <div id="chat-partner-name" class="font-bold text-sm truncate">Select a conversation</div>
+                  <div id="chat-partner-sub" class="text-xs text-slate-500 dark:text-slate-400 truncate">Click any user on the left to start chatting</div>
+                </div>
+              </div>
+              <button id="chat-confirm-return-btn" type="button" class="hidden px-3 py-1.5 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-semibold transition cursor-pointer shrink-0">
+                Confirm Legit Return (+25 pts)
+              </button>
+            </div>
+
+            <div id="chat-messages" class="flex-1 p-4 space-y-3 overflow-y-auto max-h-[380px] min-h-[300px]"></div>
+
+            <form id="chat-form" class="p-3 bg-white dark:bg-slate-900 border-t border-slate-200 dark:border-slate-800 flex items-center gap-2">
+              <input id="chat-input" type="text" placeholder="Type a message about pickup or item details..." disabled class="flex-1 px-3.5 py-2.5 rounded-xl border border-slate-300 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 text-sm focus:outline-none focus:ring-2 focus:ring-lpu-500 disabled:opacity-50" />
+              <button id="chat-send-btn" type="submit" disabled class="px-4 py-2.5 rounded-xl bg-lpu-600 hover:bg-lpu-700 disabled:opacity-50 text-white font-semibold text-sm transition cursor-pointer flex items-center gap-1.5">
+                <i data-lucide="send" class="w-4 h-4"></i>
+                <span>Send</span>
+              </button>
+            </form>
+          </div>
+        </div>
+      </section>
+
+      <!-- VIEW 4: FULL UNIVERSITY MAP -->
+      <section id="view-map" class="view-section hidden">
+        <div class="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl shadow-sm overflow-hidden">
+          <div class="p-4 border-b border-slate-200 dark:border-slate-800 flex flex-wrap items-center justify-between gap-3">
+            <div>
+              <h2 class="text-lg font-bold">Lovely Professional University — 600-Acre Campus Map</h2>
+              <p class="text-xs text-slate-500 dark:text-slate-400">Blue lines = campus roads · Blue labels = campus blocks &amp; landmarks</p>
+            </div>
+            <div class="flex items-center gap-2 flex-wrap">
+              <button data-map-filter="all" class="map-filter-btn px-3 py-1.5 rounded-lg text-xs font-semibold transition cursor-pointer">All</button>
+              <button data-map-filter="lost" class="map-filter-btn px-3 py-1.5 rounded-lg text-xs font-semibold transition cursor-pointer">Lost</button>
+              <button data-map-filter="found" class="map-filter-btn px-3 py-1.5 rounded-lg text-xs font-semibold transition cursor-pointer">Found</button>
+              <button data-map-filter="pickup" class="map-filter-btn px-3 py-1.5 rounded-lg text-xs font-semibold transition cursor-pointer">Pickup Points</button>
+              <button id="map-reset-btn" type="button" class="px-3 py-1.5 rounded-lg border border-slate-300 dark:border-slate-700 text-xs font-semibold hover:bg-slate-100 dark:hover:bg-slate-800 transition cursor-pointer">
+                Reset View
+              </button>
+            </div>
+          </div>
+          <div id="campus-map" style="height: 520px; width: 100%;"></div>
+          <div class="p-3 bg-slate-50 dark:bg-slate-950/50 border-t border-slate-200 dark:border-slate-800 flex flex-wrap items-center gap-4 text-xs text-slate-600 dark:text-slate-300">
+            <span class="flex items-center gap-1.5"><span class="w-3 h-3 rounded-full bg-rose-500 inline-block"></span> Lost Item Spot</span>
+            <span class="flex items-center gap-1.5"><span class="w-3 h-3 rounded-full bg-emerald-500 inline-block"></span> Found Item Spot</span>
+            <span class="flex items-center gap-1.5"><span class="w-3 h-3 rounded-full bg-blue-500 inline-block"></span> Pickup / Collection Point</span>
+            <span class="flex items-center gap-1.5"><span class="w-3 h-3 rounded-full bg-amber-500 inline-block"></span> Campus Block / Landmark</span>
+            <span class="flex items-center gap-1.5"><span class="w-4 h-1 rounded bg-sky-500 inline-block"></span> Campus Roads (Blue Lines)</span>
+          </div>
+        </div>
+      </section>
+
+      <!-- VIEW 5: PROFILE & SETTINGS -->
+      <section id="view-profile" class="view-section hidden">
+        <div class="max-w-3xl mx-auto space-y-6">
+          <!-- Profile Card -->
+          <div class="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl shadow-sm p-6">
+            <div class="flex flex-col sm:flex-row items-center sm:items-start justify-between gap-5">
+              <div class="flex flex-col sm:flex-row items-center gap-4 text-center sm:text-left">
+                <div id="profile-avatar" class="w-20 h-20 rounded-full bg-gradient-to-br from-lpu-500 to-amber-500 text-white flex items-center justify-center text-2xl font-extrabold shadow-md shrink-0">
+                  AS
+                </div>
+                <div>
+                  <h2 id="profile-name" class="text-xl font-bold">Aarav Sharma</h2>
+                  <p id="profile-username" class="text-sm font-medium text-slate-500 dark:text-slate-400">@aarav_lpu</p>
+                  <div class="mt-2 inline-flex items-center gap-2 px-3 py-1 rounded-full bg-amber-50 dark:bg-amber-950/50 border border-amber-200 dark:border-amber-800 text-amber-700 dark:text-amber-300 text-xs font-bold">
+                    <i data-lucide="award" class="w-4 h-4"></i>
+                    <span>Help Score: <span id="profile-help-score">145</span> pts</span>
+                  </div>
+                </div>
+              </div>
+              <div class="flex items-center gap-2.5">
+                <button id="open-settings-btn" type="button" class="inline-flex items-center gap-1.5 px-4 py-2 rounded-xl border border-slate-300 dark:border-slate-700 hover:bg-slate-100 dark:hover:bg-slate-800 text-sm font-semibold transition cursor-pointer">
+                  <i data-lucide="settings" class="w-4 h-4"></i>
+                  <span>Settings</span>
+                </button>
+                <button id="logout-btn" type="button" class="inline-flex items-center gap-1.5 px-4 py-2 rounded-xl bg-rose-600 hover:bg-rose-700 text-white text-sm font-semibold transition cursor-pointer">
+                  <i data-lucide="log-out" class="w-4 h-4"></i>
+                  <span>Logout</span>
+                </button>
+              </div>
+            </div>
+          </div>
+
+          <!-- Settings Panel (toggled from Profile Settings button) -->
+          <div id="settings-panel" class="hidden bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl shadow-sm p-6 space-y-6">
+            <div class="flex items-center justify-between border-b border-slate-200 dark:border-slate-800 pb-3">
+              <h3 class="text-lg font-bold flex items-center gap-2">
+                <i data-lucide="sliders" class="w-5 h-5 text-lpu-600"></i>
+                Account &amp; Appearance Settings
+              </h3>
+              <button id="close-settings-btn" type="button" class="text-xs font-semibold text-slate-500 hover:text-slate-700 dark:hover:text-slate-300 cursor-pointer">Close</button>
+            </div>
+
+            <!-- 1. Theme Toggle (Dark / Light) -->
+            <div class="flex items-center justify-between gap-4 p-4 rounded-xl bg-slate-50 dark:bg-slate-800/60 border border-slate-200 dark:border-slate-700">
+              <div>
+                <div class="font-semibold text-sm">Website Theme</div>
+                <div class="text-xs text-slate-500 dark:text-slate-400">Switch between Light and Dark mode</div>
+              </div>
+              <div class="flex items-center gap-1 bg-slate-200 dark:bg-slate-900 p-1 rounded-xl">
+                <button id="theme-light-btn" type="button" class="px-3 py-1.5 rounded-lg text-xs font-semibold transition cursor-pointer">Light</button>
+                <button id="theme-dark-btn" type="button" class="px-3 py-1.5 rounded-lg text-xs font-semibold transition cursor-pointer">Dark</button>
+              </div>
+            </div>
+
+            <!-- 2. Change Username -->
+            <form id="change-username-form" class="space-y-3">
+              <label for="new-username-input" class="block text-sm font-semibold">Change Username</label>
+              <div class="flex gap-2">
+                <input id="new-username-input" type="text" required placeholder="Enter new username" class="flex-1 px-3.5 py-2 rounded-xl border border-slate-300 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 text-sm focus:outline-none focus:ring-2 focus:ring-lpu-500" />
+                <button type="submit" class="px-4 py-2 rounded-xl bg-lpu-600 hover:bg-lpu-700 text-white text-sm font-semibold transition cursor-pointer">Update</button>
+              </div>
+            </form>
+
+            <!-- 3. Change Password -->
+            <form id="change-password-form" class="space-y-3 pt-2 border-t border-slate-200 dark:border-slate-800">
+              <div class="text-sm font-semibold">Change Password</div>
+              <div class="grid grid-cols-1 sm:grid-cols-3 gap-2.5">
+                <input id="current-password-input" type="password" required placeholder="Current password" class="px-3.5 py-2 rounded-xl border border-slate-300 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 text-sm focus:outline-none focus:ring-2 focus:ring-lpu-500" />
+                <input id="new-password-input" type="password" required placeholder="New password" class="px-3.5 py-2 rounded-xl border border-slate-300 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 text-sm focus:outline-none focus:ring-2 focus:ring-lpu-500" />
+                <input id="confirm-password-input" type="password" required placeholder="Confirm new password" class="px-3.5 py-2 rounded-xl border border-slate-300 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 text-sm focus:outline-none focus:ring-2 focus:ring-lpu-500" />
+              </div>
+              <button type="submit" class="px-4 py-2 rounded-xl bg-slate-900 dark:bg-slate-700 hover:bg-slate-800 text-white text-sm font-semibold transition cursor-pointer">Save New Password</button>
+            </form>
+          </div>
+
+          <!-- User's Own Posts -->
+          <div class="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl shadow-sm p-6">
+            <h3 class="text-base font-bold mb-4">Your Posted Items</h3>
+            <div id="profile-posts-list" class="space-y-3"></div>
+          </div>
+        </div>
+      </section>
+
+    </main>
+
+    <!-- Mobile Bottom Navigation Bar (All 6 Buttons) -->
+    <nav aria-label="Mobile Navigation" class="md:hidden fixed bottom-0 inset-x-0 z-40 bg-white/95 dark:bg-slate-900/95 backdrop-blur border-t border-slate-200 dark:border-slate-800 grid grid-cols-6 h-16">
+      <button data-nav="home" class="nav-btn flex flex-col items-center justify-center gap-0.5 text-[11px] font-medium cursor-pointer">
+        <i data-lucide="home" class="w-4 h-4"></i>
+        <span>Home</span>
+      </button>
+      <button data-nav="search" class="nav-btn flex flex-col items-center justify-center gap-0.5 text-[11px] font-medium cursor-pointer">
+        <i data-lucide="search" class="w-4 h-4"></i>
+        <span>Search</span>
+      </button>
+      <button data-nav="add" class="nav-btn flex flex-col items-center justify-center gap-0.5 text-[11px] font-medium cursor-pointer">
+        <i data-lucide="plus-square" class="w-4 h-4"></i>
+        <span>Add</span>
+      </button>
+      <button data-nav="messages" class="nav-btn relative flex flex-col items-center justify-center gap-0.5 text-[11px] font-medium cursor-pointer">
+        <i data-lucide="message-circle" class="w-4 h-4"></i>
+        <span>Chats</span>
+      </button>
+      <button data-nav="map" class="nav-btn flex flex-col items-center justify-center gap-0.5 text-[11px] font-medium cursor-pointer">
+        <i data-lucide="map-pin" class="w-4 h-4"></i>
+        <span>Map</span>
+      </button>
+      <button data-nav="profile" class="nav-btn flex flex-col items-center justify-center gap-0.5 text-[11px] font-medium cursor-pointer">
+        <i data-lucide="user" class="w-4 h-4"></i>
+        <span>Profile</span>
+      </button>
+    </nav>
+  </div>
+
+  <script src="script.js"></script>
+</body>
+</html>
